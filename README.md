@@ -4,6 +4,8 @@
 
 Find out what you worked on yesterday, last week, last month. Ever forgotten what files you touched in a late-night coding session? What command fixed the build? What you decided during that long Claude convo last Tuesday? Scribe lets you re-read it all.
 
+> ℹ️ **Heads up:** Claude Code (and most AI coding tools) already record your chats locally on your own computer — that's where the `.jsonl` files Scribe reads come from. Scribe itself sends nothing anywhere. If you ask an AI agent to run `/scribe` for you, it reads the same local files; no cloud, no account, no upload. You're just reading your own data in a nicer wrapper.
+
 Single-file HTML app + a ~100-line Python script. No install beyond Python 3.9+. No backend. No upload. All your transcripts stay local.
 
 ---
