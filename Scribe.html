@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📜 Scribe — Claude Transcript Book</title>
+<style>
+  :root {
+    --bg: #0b0d17;
+    --panel: #141827;
+    --panel-2: #1b2033;
+    --border: #2a3146;
+    --text: #e6e9f2;
+    --muted: #8891ad;
+    --accent: #6ee7ff;
+    --user: #4ade80;
+    --assistant: #a78bfa;
+    --tool: #fbbf24;
+    --bash: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100%; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  header { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  h1 { font-size: 18px; display: flex; align-items: center; gap: 8px; }
+  .subtitle { font-size: 11px; color: var(--muted); margin-left: 8px; }
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; }
+  button, label.button { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; transition: border-color 0.15s; }
+  button:hover, label.button:hover { border-color: var(--accent); }
+  button.primary, label.button.primary { background: var(--accent); color: #001319; border-color: var(--accent); font-weight: 700; }
+  input[type=file] { display: none; }
+
+  .search-bar { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; }
+  #searchInput { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 8px 12px; font-size: 13px; outline: none; }
+  #searchInput:focus { border-color: var(--accent); }
+  .result-count { font-size: 11px; color: var(--muted); white-space: nowrap; align-self: center; }
+
+  .main { flex: 1; display: grid; grid-template-columns: 280px 1fr 260px; overflow: hidden; }
+  @media (max-width: 980px) { .main { grid-template-columns: 260px 1fr; } .artifacts { display: none; } }
+  @media (max-width: 680px) { .main { grid-template-columns: 1fr; } .sidebar, .artifacts { display: none; } }
+
+  .sidebar, .artifacts { overflow-y: auto; background: var(--panel); border-right: 1px solid var(--border); }
+  .artifacts { border-right: none; border-left: 1px solid var(--border); }
+  .sidebar-head { padding: 10px 14px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+
+  .session-item { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+  .session-item:hover { background: var(--panel-2); }
+  .session-item.active { background: var(--panel-2); border-left: 3px solid var(--accent); padding-left: 11px; }
+  .session-item .date { font-size: 11px; color: var(--accent); font-weight: 600; }
+  .session-item .proj { font-size: 12px; margin-top: 2px; }
+  .session-item .meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .session-item .title { font-size: 11px; color: var(--muted); margin-top: 4px; font-style: italic; line-height: 1.3; }
+
+  .content { overflow-y: auto; padding: 16px 24px 40px; }
+  .content::-webkit-scrollbar { width: 8px; }
+  .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .session-head { padding: 12px 0 16px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .session-head h2 { font-size: 18px; }
+  .session-head .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .msg { margin-bottom: 14px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); font-size: 13px; line-height: 1.55; }
+  .msg.user { border-left: 3px solid var(--user); }
+  .msg.assistant { border-left: 3px solid var(--assistant); }
+  .msg .role { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 6px; color: var(--muted); }
+  .msg.user .role { color: var(--user); }
+  .msg.assistant .role { color: var(--assistant); }
+  .msg .timestamp { font-size: 10px; color: var(--muted); float: right; }
+  .msg .text { white-space: pre-wrap; word-break: break-word; }
+  .msg .text code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 12px; color: var(--accent); }
+  .msg pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin: 6px 0; overflow-x: auto; font-family: "Consolas", monospace; font-size: 12px; white-space: pre; }
+
+  .tool-call { margin-top: 8px; padding: 8px 10px; background: var(--panel-2); border-radius: 6px; border-left: 3px solid var(--tool); font-size: 12px; }
+  .tool-call.bash { border-left-color: var(--bash); }
+  .tool-call .name { font-size: 10px; font-weight: 700; color: var(--tool); text-transform: uppercase; margin-bottom: 4px; }
+  .tool-call.bash .name { color: var(--bash); }
+  .tool-call .body { font-family: "Consolas", monospace; font-size: 11px; color: var(--muted); white-space: pre-wrap; word-break: break-all; }
+
+  .artifact-section { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .artifact-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 8px; }
+  .artifact-item { font-family: "Consolas", monospace; font-size: 11px; padding: 4px 8px; background: var(--panel-2); border-radius: 4px; margin-bottom: 3px; word-break: break-all; color: var(--text); }
+  .artifact-item.bash { color: var(--bash); }
+  .artifact-item.file { color: var(--accent); }
+  .artifact-item .count { color: var(--muted); font-size: 10px; margin-left: 4px; }
+
+  mark { background: rgba(251,191,36,0.35); color: var(--text); padding: 1px 2px; border-radius: 3px; }
+
+  .welcome { text-align: center; color: var(--muted); padding: 60px 20px; line-height: 1.8; font-size: 14px; max-width: 700px; margin: 0 auto; }
+  .welcome h2 { font-size: 22px; color: var(--text); margin-bottom: 16px; }
+  .welcome code { background: var(--panel-2); padding: 3px 8px; border-radius: 4px; color: var(--accent); font-size: 12px; font-family: "Consolas", monospace; }
+  .welcome p { margin-bottom: 10px; }
+  .welcome .steps { text-align: left; max-width: 560px; margin: 20px auto; font-size: 13px; }
+  .welcome .steps strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📜 Scribe <span class="subtitle" id="subtitle">Drop Claude transcripts here</span></h1>
+  </div>
+  <div class="controls">
+    <label class="button primary" for="fileInput">📂 Load Transcripts</label>
+    <input type="file" id="fileInput" accept=".jsonl,application/json" multiple>
+    <button id="exportBtn">⬇ Export Session</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+</header>
+
+<div class="search-bar">
+  <input id="searchInput" type="text" placeholder="🔎 Search every message, file path, or command" autocomplete="off">
+  <span class="result-count" id="resultCount"></span>
+</div>
+
+<div class="main">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">Sessions (<span id="sessionCount">0</span>)</div>
+    <div id="sessionList"></div>
+  </aside>
+
+  <section class="content" id="content">
+    <div class="welcome">
+      <h2>📜 Scribe — Claude Transcript Book</h2>
+      <p>Turn your Claude Code sessions into a searchable, readable book.</p>
+      <p>Find out what you worked on yesterday, last week, last month.</p>
+      <div class="steps">
+        <p><strong>1.</strong> Click <strong>📂 Load Transcripts</strong> above.</p>
+        <p><strong>2.</strong> Pick any <code>.jsonl</code> files from your <code>.claude/projects/&lt;project&gt;/</code> folder. (You can select many at once.)</p>
+        <p><strong>3.</strong> Sessions appear in the left sidebar by date. Click any to read.</p>
+        <p><strong>4.</strong> Use the search bar to find a file path, a command, or anything you typed.</p>
+        <p><strong>5.</strong> The right panel shows artifacts — files touched, commands run, commits made.</p>
+        <p><strong>6.</strong> Click <strong>⬇ Export Session</strong> to save a session as Markdown — great for devlog writing.</p>
+      </div>
+      <p style="margin-top:30px;color:var(--muted);font-size:12px">On Windows, transcripts live at:<br><code>C:\Users\&lt;you&gt;\.claude\projects\&lt;project-hash&gt;\*.jsonl</code></p>
+    </div>
+  </section>
+
+  <aside class="artifacts" id="artifacts"></aside>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fileInput = $('fileInput');
+const exportBtn = $('exportBtn');
+const clearBtn = $('clearBtn');
+const searchInput = $('searchInput');
+const sessionList = $('sessionList');
+const content = $('content');
+const artifactsEl = $('artifacts');
+const subtitle = $('subtitle');
+const sessionCount = $('sessionCount');
+const resultCount = $('resultCount');
+
+let sessions = {};
+let selectedSessionId = null;
+let query = '';
+
+function esc(s) {
+  return String(s || '').replaceAll(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function highlight(text, q) {
+  if (!q) return esc(text);
+  const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  return esc(text).replace(re, '<mark>$1</mark>');
+}
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+function fmtDay(iso) { return new Date(iso).toLocaleDateString(); }
+function shortenCwd(cwd) {
+  if (!cwd) return '';
+  const parts = cwd.replace(/\\/g, '/').split('/').filter(Boolean);
+  return parts.slice(-2).join('/');
+}
+
+async function parseFile(file) {
+  const text = await file.text();
+  const lines = text.split('\n').filter(l => l.trim());
+  for (const line of lines) {
+    let rec;
+    try { rec = JSON.parse(line); } catch { continue; }
+    if (rec.type === 'queue-operation') continue;
+    if (!rec.sessionId) continue;
+
+    if (!sessions[rec.sessionId]) {
+      sessions[rec.sessionId] = {
+        id: rec.sessionId,
+        cwd: rec.cwd || '',
+        gitBranch: rec.gitBranch || '',
+        messages: [],
+        firstTs: rec.timestamp,
+        lastTs: rec.timestamp,
+        firstUserText: ''
+      };
+    }
+    const s = sessions[rec.sessionId];
+    if (rec.timestamp) {
+      if (!s.firstTs || rec.timestamp < s.firstTs) s.firstTs = rec.timestamp;
+      if (!s.lastTs  || rec.timestamp > s.lastTs)  s.lastTs  = rec.timestamp;
+    }
+    if (rec.cwd) s.cwd = rec.cwd;
+
+    if (rec.type === 'user' || rec.type === 'assistant') {
+      s.messages.push(rec);
+      if (rec.type === 'user' && !s.firstUserText && rec.message?.content) {
+        const content = rec.message.content;
+        if (Array.isArray(content)) {
+          const tb = content.find(c => c.type === 'text');
+          if (tb?.text) s.firstUserText = tb.text.slice(0, 120);
+        } else if (typeof content === 'string') {
+          s.firstUserText = content.slice(0, 120);
+        }
+      }
+    }
+  }
+}
+
+function renderSidebar() {
+  sessionList.innerHTML = '';
+  const list = Object.values(sessions).sort((a, b) => (b.lastTs || '').localeCompare(a.lastTs || ''));
+  sessionCount.textContent = list.length;
+  const q = query.toLowerCase();
+  for (const s of list) {
+    if (q) {
+      const blob = (s.firstUserText + ' ' + s.cwd + ' ' + JSON.stringify(s.messages)).toLowerCase();
+      if (!blob.includes(q)) continue;
+    }
+    const div = document.createElement('div');
+    div.className = 'session-item' + (selectedSessionId === s.id ? ' active' : '');
+    div.innerHTML = `
+      <div class="date">${fmtDay(s.firstTs)}</div>
+      <div class="proj">${esc(shortenCwd(s.cwd))}</div>
+      <div class="meta">${s.messages.length} msgs · ${esc(s.gitBranch || '—')}</div>
+      ${s.firstUserText ? `<div class="title">${esc(s.firstUserText)}</div>` : ''}
+    `;
+    div.addEventListener('click', () => { selectedSessionId = s.id; renderSidebar(); renderContent(); renderArtifacts(); });
+    sessionList.appendChild(div);
+  }
+}
+
+function extractText(contentArr) {
+  if (typeof contentArr === 'string') return contentArr;
+  if (!Array.isArray(contentArr)) return '';
+  return contentArr.filter(c => c.type === 'text').map(c => c.text).join('\n\n');
+}
+function extractToolUses(contentArr) {
+  if (!Array.isArray(contentArr)) return [];
+  return contentArr.filter(c => c.type === 'tool_use');
+}
+
+function renderMsg(rec) {
+  const role = rec.type;
+  const text = extractText(rec.message?.content);
+  const tools = extractToolUses(rec.message?.content);
+  const q = query;
+  let html = `<div class="msg ${role}">`;
+  html += `<div class="role">${role} <span class="timestamp">${fmtDate(rec.timestamp)}</span></div>`;
+  if (text) html += `<div class="text">${highlight(text, q)}</div>`;
+  for (const t of tools) {
+    const isBash = t.name === 'Bash' || t.name === 'PowerShell';
+    const input = t.input || {};
+    let preview = '';
+    if (t.name === 'Bash' || t.name === 'PowerShell') preview = input.command || '';
+    else if (t.name === 'Edit' || t.name === 'Write' || t.name === 'Read') preview = input.file_path || '';
+    else if (t.name === 'Grep' || t.name === 'Glob') preview = input.pattern || '';
+    else preview = JSON.stringify(input).slice(0, 240);
+    html += `<div class="tool-call ${isBash ? 'bash' : ''}"><div class="name">${esc(t.name || 'tool')}</div><div class="body">${highlight(preview, q)}</div></div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function renderContent() {
+  content.innerHTML = '';
+  if (!selectedSessionId) {
+    // show search results across all if query set
+    if (query) {
+      renderSearchResults();
+      return;
+    }
+    content.innerHTML = '<div class="welcome"><h2>Pick a session</h2><p>Click a session in the sidebar to read it.</p></div>';
+    return;
+  }
+  const s = sessions[selectedSessionId];
+  if (!s) return;
+  const head = document.createElement('div');
+  head.className = 'session-head';
+  head.innerHTML = `
+    <h2>${esc(shortenCwd(s.cwd))}</h2>
+    <div class="meta">${fmtDate(s.firstTs)} → ${fmtDate(s.lastTs)} · ${s.messages.length} messages · ${esc(s.gitBranch || '—')}</div>
+  `;
+  content.appendChild(head);
+
+  let shown = 0;
+  for (const rec of s.messages) {
+    const text = extractText(rec.message?.content);
+    const tools = extractToolUses(rec.message?.content);
+    if (query) {
+      const blob = (text + ' ' + tools.map(t => JSON.stringify(t.input)).join(' ')).toLowerCase();
+      if (!blob.includes(query.toLowerCase())) continue;
+    }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = renderMsg(rec);
+    content.appendChild(wrap.firstChild);
+    shown++;
+  }
+  resultCount.textContent = query ? `${shown} matches` : `${s.messages.length} messages`;
+}
+
+function renderSearchResults() {
+  const q = query.toLowerCase();
+  const list = Object.values(sessions);
+  let total = 0;
+  for (const s of list) {
+    const matches = s.messages.filter(rec => {
+      const text = extractText(rec.message?.content);
+      const tools = extractToolUses(rec.message?.content);
+      const blob = (text + ' ' + tools.map(t => JSON.stringify(t.input)).join(' ')).toLowerCase();
+      return blob.includes(q);
+    });
+    if (!matches.length) continue;
+    const head = document.createElement('div');
+    head.className = 'session-head';
+    head.innerHTML = `<h2>${esc(shortenCwd(s.cwd))} <span style="font-size:12px;color:var(--muted)">${fmtDay(s.firstTs)}</span></h2><div class="meta">${matches.length} matches</div>`;
+    content.appendChild(head);
+    for (const rec of matches) {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = renderMsg(rec);
+      content.appendChild(wrap.firstChild);
+      total++;
+    }
+  }
+  resultCount.textContent = `${total} matches across ${list.length} sessions`;
+}
+
+function renderArtifacts() {
+  artifactsEl.innerHTML = '';
+  if (!selectedSessionId) return;
+  const s = sessions[selectedSessionId];
+  if (!s) return;
+
+  const files = new Map();
+  const bashCmds = [];
+  const commits = [];
+
+  for (const rec of s.messages) {
+    const tools = extractToolUses(rec.message?.content);
+    for (const t of tools) {
+      const input = t.input || {};
+      if (t.name === 'Edit' || t.name === 'Write') {
+        const fp = input.file_path || '';
+        if (fp) files.set(fp, (files.get(fp) || 0) + 1);
+      }
+      if (t.name === 'Bash' || t.name === 'PowerShell') {
+        const cmd = (input.command || '').split('\n')[0];
+        if (cmd) {
+          bashCmds.push(cmd.slice(0, 200));
+          if (/git\s+commit/.test(cmd)) {
+            const m = /-m\s+"([^"]+)"/.exec(cmd) || /-m\s+'([^']+)'/.exec(cmd);
+            if (m) commits.push(m[1]);
+          }
+        }
+      }
+    }
+  }
+
+  function section(title, items, cls) {
+    if (!items || items.length === 0) return;
+    const div = document.createElement('div');
+    div.className = 'artifact-section';
+    let html = `<h3>${esc(title)} (${items.length})</h3>`;
+    for (const it of items.slice(0, 40)) {
+      const [text, count] = Array.isArray(it) ? it : [it, null];
+      html += `<div class="artifact-item ${cls || ''}">${esc(text)}${count ? ` <span class="count">×${count}</span>` : ''}</div>`;
+    }
+    div.innerHTML = html;
+    artifactsEl.appendChild(div);
+  }
+
+  const filesList = Array.from(files.entries()).sort((a, b) => b[1] - a[1]);
+  section('Files touched', filesList.map(([f, n]) => [f, n]), 'file');
+  section('Commits', commits, '');
+  const uniqBash = [...new Set(bashCmds)];
+  section('Commands', uniqBash.slice(0, 40), 'bash');
+}
+
+function exportSession() {
+  if (!selectedSessionId) { alert('Select a session first.'); return; }
+  const s = sessions[selectedSessionId];
+  let md = `# Session: ${shortenCwd(s.cwd)}\n\n`;
+  md += `**Date:** ${fmtDate(s.firstTs)} → ${fmtDate(s.lastTs)}\n`;
+  md += `**Messages:** ${s.messages.length}\n`;
+  md += `**Branch:** ${s.gitBranch || '—'}\n\n---\n\n`;
+  for (const rec of s.messages) {
+    const text = extractText(rec.message?.content);
+    const tools = extractToolUses(rec.message?.content);
+    md += `## ${rec.type} — ${fmtDate(rec.timestamp)}\n\n`;
+    if (text) md += text + '\n\n';
+    for (const t of tools) {
+      const input = t.input || {};
+      let body = '';
+      if (t.name === 'Bash' || t.name === 'PowerShell') body = input.command || '';
+      else if (t.name === 'Edit' || t.name === 'Write' || t.name === 'Read') body = input.file_path || '';
+      else body = JSON.stringify(input, null, 2).slice(0, 800);
+      md += `**Tool · ${t.name}**\n\`\`\`\n${body}\n\`\`\`\n\n`;
+    }
+    md += '\n';
+  }
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `scribe-${fmtDay(s.firstTs).replaceAll('/','-')}-${s.id.slice(0,8)}.md`;
+  a.click();
+}
+
+fileInput.addEventListener('change', async e => {
+  const files = Array.from(e.target.files);
+  for (const f of files) await parseFile(f);
+  const total = Object.values(sessions).reduce((n, s) => n + s.messages.length, 0);
+  subtitle.textContent = `${Object.keys(sessions).length} sessions · ${total} messages loaded`;
+  renderSidebar();
+  if (!selectedSessionId) {
+    const first = Object.values(sessions).sort((a,b) => (b.lastTs||'').localeCompare(a.lastTs||''))[0];
+    if (first) { selectedSessionId = first.id; renderSidebar(); renderContent(); renderArtifacts(); }
+  }
+});
+
+exportBtn.addEventListener('click', exportSession);
+
+clearBtn.addEventListener('click', () => {
+  sessions = {};
+  selectedSessionId = null;
+  query = '';
+  searchInput.value = '';
+  sessionList.innerHTML = '';
+  artifactsEl.innerHTML = '';
+  subtitle.textContent = 'Drop Claude transcripts here';
+  sessionCount.textContent = '0';
+  resultCount.textContent = '';
+  content.innerHTML = document.querySelector('.welcome')?.outerHTML || '';
+  location.reload();
+});
+
+let searchTimer;
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    query = searchInput.value.trim();
+    if (query && !selectedSessionId) {
+      renderSearchResults();
+    } else {
+      renderSidebar();
+      renderContent();
+    }
+  }, 200);
+});
+
+searchInput.focus();
+</script>
+</body>
+</html>
