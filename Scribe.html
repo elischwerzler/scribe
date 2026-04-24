@@ -458,6 +458,16 @@ searchInput.addEventListener('input', () => {
 });
 
 searchInput.focus();
+
+// Auto-load embedded data (injected by scribe.py)
+if (globalThis.SCRIBE_EMBEDDED_DATA && globalThis.SCRIBE_EMBEDDED_DATA.sessions) {
+  sessions = globalThis.SCRIBE_EMBEDDED_DATA.sessions;
+  const total = Object.values(sessions).reduce((n, s) => n + (s.messages?.length || 0), 0);
+  subtitle.textContent = `${Object.keys(sessions).length} sessions · ${total} messages (embedded)`;
+  renderSidebar();
+  const first = Object.values(sessions).sort((a,b) => (b.lastTs||'').localeCompare(a.lastTs||''))[0];
+  if (first) { selectedSessionId = first.id; renderSidebar(); renderContent(); renderArtifacts(); }
+}
 </script>
 </body>
 </html>

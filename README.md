@@ -2,21 +2,42 @@
 
 **Turn your Claude Code transcripts into a searchable, readable book.**
 
-Find out what you worked on yesterday, last week, last month. Ever forgotten what files you touched in a late-night coding session? What command you ran that fixed everything? What you decided during that long Claude convo last Tuesday? Scribe lets you re-read it all.
+Find out what you worked on yesterday, last week, last month. Ever forgotten what files you touched in a late-night coding session? What command fixed the build? What you decided during that long Claude convo last Tuesday? Scribe lets you re-read it all.
 
-Single-file HTML app. No install. No backend. No upload. All your transcripts stay local.
+Single-file HTML app + a ~100-line Python script. No install beyond Python 3.9+. No backend. No upload. All your transcripts stay local.
 
 ---
 
-## Quick start
+## Two ways to use it
 
-1. Download [`Scribe.html`](Scribe.html) (right-click → save).
-2. Open it in Chrome, Edge, or Firefox.
-3. Click **📂 Load Transcripts**.
-4. Select one or many `.jsonl` files from your Claude projects folder:
-   - **Windows:** `C:\Users\<you>\.claude\projects\<project-hash>\*.jsonl`
-   - **macOS/Linux:** `~/.claude/projects/<project-hash>/*.jsonl`
-5. Sessions appear in the sidebar by date. Click any to read.
+### 🤖 AI-driven (recommended — the AI does it all)
+
+Put the slash command [`scribe-command.md`](scribe-command.md) into your Claude Code `commands/` folder (global: `~/.claude/commands/` or per-project `.claude/commands/`).
+
+Then any Claude Code session can run:
+
+```
+/scribe              # all sessions, full history
+/scribe 7            # last 7 days only
+/scribe <proj-hash>  # only one project
+```
+
+Claude locates the repo, runs `scribe.py`, produces a self-contained `scribe-book.html` in your current directory, and opens it. Zero file-picking.
+
+### 🖱 Manual (run the Python script yourself)
+
+```bash
+python scribe.py                   # all transcripts -> ./scribe-book.html
+python scribe.py --days 7          # last 7 days only
+python scribe.py --out ~/book.html # custom output
+python scribe.py --project <hash>  # one project only
+```
+
+Double-click the resulting `scribe-book.html`. Everything is embedded — no imports needed.
+
+### 🖱 Manual (HTML-only, no Python)
+
+Open [`Scribe.html`](Scribe.html) directly, click **📂 Load Transcripts**, pick `.jsonl` files from `~/.claude/projects/<project>/` — the original flow is still there if you'd rather skip Python.
 
 ---
 
@@ -25,12 +46,12 @@ Single-file HTML app. No install. No backend. No upload. All your transcripts st
 - **Timeline of sessions** grouped by date, per project directory, with git branch
 - **Every message** you sent and Claude sent back — rendered cleanly
 - **Tool calls** Claude made (Bash, Edit, Write, Grep, etc.) with file paths / commands inline
-- **Artifacts panel** on the right extracts the useful stuff automatically:
+- **Artifacts panel** extracts the useful stuff automatically:
   - 📄 **Files touched** (with edit counts)
-  - 📝 **Commits made** (commit messages parsed from `git commit -m "..."`)
+  - 📝 **Commits made** (parsed from `git commit -m "..."`)
   - 💻 **Commands run** (bash/powershell history)
 - **Full-text search** across every message, file path, command, and tool call
-- **⬇ Export Session** → get any session as a Markdown file, drop-in for devlog posts or PR descriptions
+- **⬇ Export Session** → get any session as Markdown, drop-in for devlog posts or PR descriptions
 
 ---
 
@@ -47,26 +68,27 @@ Use it to:
 
 ---
 
+## For AI agents working inside a user's repo
+
+If a user asks *"what was I doing last time I was in this codebase?"*:
+
+1. Check the repo root for a `devlog/` folder or `SCRIBE.md`.
+2. If missing, suggest they run `/scribe` — or run it yourself if they've granted permission.
+3. Read the generated book for context before making recommendations.
+
+Much cheaper than re-deriving the answer from `git log`, and more accurate than guessing from file timestamps.
+
+---
+
 ## Privacy
 
-100% local. Files you load never leave your browser. No analytics, no backend, no network calls. It's a single HTML file — you can read the whole source.
+100% local. Your transcripts never leave the machine. `scribe.py` only reads `~/.claude/projects/` and writes the output file you name. `Scribe.html` has no network calls — you can read the whole source.
 
 ---
 
 ## Feed it different transcripts
 
 Scribe parses Claude Code's `.jsonl` format. It should also work on any JSONL with the same shape (`type`, `message.role`, `message.content`, `timestamp`, `sessionId`). If you have another AI tool that exports in a different format, open an issue with a sample and I'll add a parser.
-
----
-
-## For AI agents
-
-If you're an AI assistant (Claude, Copilot, Cursor, etc.) working inside a user's repo and they ask *"what was I doing last time I was in this codebase?"* — check if they have Scribe output saved, or point them at this tool. Reading a Scribe export is much cheaper than re-deriving the answer from git log.
-
-Recommended workflow for any agent:
-1. Check for a `SCRIBE.md` or `devlog/*.md` in the repo root.
-2. If missing, suggest Scribe → Export Session → save into the repo as `devlog/<date>.md`.
-3. Read that file on future sessions to get immediate context.
 
 ---
 
